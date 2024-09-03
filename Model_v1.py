@@ -15,17 +15,22 @@ def Prepare_Data(file_path):
     data = pd.read_excel(file_path)
 
     # Drop columns that are unnecessary, add more if needed (almost 0 feature importance or unusable features)
+    saved_columns = data[['Season', 'HomeTeam', 'AwayTeam']]
     X = data.drop(columns=['Season', 'Date', 'HomeW', 'Margin', 'HPts', 'APts', 'HomeTeam', 'AwayTeam','Time'])
     y = data['Margin']
 
     # One-hot encode categorical variables
     X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv', 'Day'], drop_first=True)
     
-    # Create interaction term between Week and TO Margin
+    # Create interaction term between Week and TO Margin, plus Week and Last 5
     X['Week_TO_Margin_Interaction'] = X['Week'] * X['Season_TO_Margin']
     X['Away_TO_Margin_Interaction'] = X['Week'] * X['A_Season_TO_Margin']
     
-    return X, y
+    # added in week interaction for win pct
+    X['Week_WinInteraction'] = X['Week'] * X['Home_WinPct']
+    X['Away_WinInteraction'] = X['Week'] * X['Away_WinPct']
+    
+    return X, y, saved_columns
 
 # show distribution of margin
 def plot_target_distribution(y):
@@ -55,7 +60,7 @@ def export_feature_importance_to_excel(model, X, output_path='feature_importance
 
 
 ## Function to build and evaluate models with GridSearchCV and visualize performance
-def build_pipeline(X, y):
+def build_pipeline(X, y, original_columns):
     # Split the data into training, validation, and holdout sets
     X_train_val, X_holdout, y_train_val, y_holdout = train_test_split(X, y, test_size=0.2, random_state=42)
     X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2, random_state=42)
@@ -169,13 +174,29 @@ def build_pipeline(X, y):
     plt.ylabel('Frequency')
     plt.grid(True)
     plt.show()
+    
+    # After creating the DataFrame with predicted values and residuals
+    result_df = X_holdout.copy()
+    result_df['Predicted'] = y_holdout_pred
+    result_df['Residual'] = residuals
+
+    # Merge the original columns back
+    result_df = result_df.merge(original_columns, left_index=True, right_index=True, how='left')
+
+    # Get the top N largest residuals
+    top_n = 30
+    top_residuals_df = result_df.assign(Residual_Abs=np.abs(result_df['Residual'])).nlargest(top_n, 'Residual_Abs')
+
+    # Export to Excel
+    top_residuals_df.to_excel('largest_residuals.xlsx', index=False)
+    print("Largest residuals exported to 'largest_residuals.xlsx'")
 
 # Prep Data
 file_path = r'C:\Users\Dylan Chung\Desktop\NFL_Spread_Model\Model_2020-2024.xlsx'
-X, spread = Prepare_Data(file_path)
+X, spread, saved = Prepare_Data(file_path)
 
 # Plot the distribution of the target variable
 plot_target_distribution(spread)
 
 # Use the function
-build_pipeline(X, spread)
+build_pipeline(X, spread, saved)
