@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.dummy import DummyRegressor
 from xgboost import XGBRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -16,19 +17,27 @@ def Prepare_Data(file_path):
 
     # Drop columns that are unnecessary, add more if needed (almost 0 feature importance or unusable features)
     saved_columns = data[['Season', 'HomeTeam', 'AwayTeam']]
-    X = data.drop(columns=['Season', 'Date', 'HomeW', 'Margin', 'HPts', 'APts', 'HomeTeam', 'AwayTeam','Time'])
+    
+    # Change every value in 'HomeTeam' to 'Home'
+    data['HomeTeam'] = 1
+    data['AwayTeam'] = 0
+
+    X = data.drop(columns=['Date', 'HomeW', 'Margin', 'HPts', 'APts', 'Time','Key'])
     y = data['Margin']
 
     # One-hot encode categorical variables
-    X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv', 'Day'], drop_first=True)
+    X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv', 'Day','Season'], drop_first=True)
     
     # Create interaction term between Week and TO Margin, plus Week and Last 5
     X['Week_TO_Margin_Interaction'] = X['Week'] * X['Season_TO_Margin']
     X['Away_TO_Margin_Interaction'] = X['Week'] * X['A_Season_TO_Margin']
     
-    # added in week interaction for win pct
+    # Added in week interaction for win pct
     X['Week_WinInteraction'] = X['Week'] * X['Home_WinPct']
     X['Away_WinInteraction'] = X['Week'] * X['Away_WinPct']
+    
+    # Drop unused columns
+    X.drop(columns=['Home_WinPct', 'Away_WinPct', 'Season_TO_Margin', 'A_Season_TO_Margin'], inplace=True)
     
     return X, y, saved_columns
 
@@ -67,6 +76,9 @@ def build_pipeline(X, y, original_columns):
 
     # Define pipelines with scaling where necessary
     pipelines = {
+        'dummy': Pipeline([
+            ('model', DummyRegressor(strategy='mean'))
+        ]),
         'Random Forest': Pipeline([
             ('model', RandomForestRegressor(random_state=42))
         ]),
@@ -82,6 +94,7 @@ def build_pipeline(X, y, original_columns):
 
     # Hyperparameter grids for each model
     param_grids = {
+        'dummy': {},
         'Random Forest': {
             'model__n_estimators': [100, 300, 500],
             'model__max_depth': [None, 10, 20, 30],
@@ -96,7 +109,7 @@ def build_pipeline(X, y, original_columns):
     }
 
     best_model = None
-    best_score = -np.inf
+    best_score = 1000
     best_model_name = None
 
     # Train and evaluate each model using GridSearchCV
@@ -105,7 +118,7 @@ def build_pipeline(X, y, original_columns):
 
         # Perform GridSearchCV if there are hyperparameters to tune
         if param_grids[model_name]:
-            grid_search = GridSearchCV(pipeline, param_grids[model_name], cv=5, scoring='r2', n_jobs=-1)
+            grid_search = GridSearchCV(pipeline, param_grids[model_name], cv=5, scoring='neg_root_mean_squared_error', n_jobs=-1)
             grid_search.fit(X_train, y_train)
             best_pipeline = grid_search.best_estimator_
             best_params = grid_search.best_params_
@@ -125,12 +138,12 @@ def build_pipeline(X, y, original_columns):
         print(f'  R^2: {r2_val:.4f}')
 
         # Track the best model based on R^2 score
-        if r2_val > best_score:
-            best_score = r2_val
+        if rmse_val < best_score:
+            best_score = rmse_val
             best_model = best_pipeline
             best_model_name = model_name
 
-    print(f'\nBest Model: {best_model_name} with R^2: {best_score:.4f}')
+    print(f'\nBest Model: {best_model_name} with neg RMSE: {best_score:.4f}')
 
     # Test the best model on the holdout set
     y_holdout_pred = best_model.predict(X_holdout)
@@ -192,11 +205,11 @@ def build_pipeline(X, y, original_columns):
     print("Largest residuals exported to 'largest_residuals.xlsx'")
 
 # Prep Data
-file_path = r'C:\Users\Dylan Chung\Desktop\NFL_Spread_Model\Model_2020-2024.xlsx'
+file_path = r'C:\Users\Dylan Chung\Desktop\NFL_Spread_Model\Data\Model_2020-2024.xlsx'
 X, spread, saved = Prepare_Data(file_path)
 
-# Plot the distribution of the target variable
-plot_target_distribution(spread)
+# Plot the distribution of the target variable for investigation
+# plot_target_distribution(spread)
 
 # Use the function
 build_pipeline(X, spread, saved)
