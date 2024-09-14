@@ -9,21 +9,23 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 import numpy as np
 import matplotlib.pyplot as plt
+import joblib
 
 ### Take input data and preprocess it for training/testing
 def Prepare_Data(file_path):
     # Read the Excel file into a DataFrame
     data = pd.read_excel(file_path)
 
-    # Drop columns that are unnecessary, add more if needed (almost 0 feature importance or unusable features)
-    saved_columns = data[['Season', 'HomeTeam', 'AwayTeam']]
+    # Save columns for later analysis
+    saved_columns = data[['Season', 'HomeTeam', 'AwayTeam','Margin','Vegas_Margin']]
+    vegas = data['Vegas_Margin']
     
     # Change every value in 'HomeTeam' to 'Home'
     data['HomeTeam'] = 1
     data['AwayTeam'] = 0
 
     # DROP UNNEEDED COLUMNS
-    X = data.drop(columns=['Date', 'Winner/tie', 'Margin', 'HPts', 'APts', 'Vegas_Margin','Time','Home_Key','Away_Key','WeekMinus'])
+    X = data.drop(columns=['Date', 'Winner/tie', 'Margin', 'HPts', 'APts', 'Vegas_Margin','Time','Home_Key','Away_Key','WeekMinus','Vegas_Margin'])
     y = data['Margin']
 
     # One-hot encode categorical variables
@@ -46,7 +48,7 @@ def Prepare_Data(file_path):
     # Drop unused columns
     X.drop(columns=['Home_WinPct', 'Away_WinPct', 'Season_TO_Margin', 'A_Season_TO_Margin','Penalty_Yards','A_Penalty_Yards','Third_Down','A_Third_Down'], inplace=True)
     
-    return X, y, saved_columns
+    return X, y, saved_columns, vegas
 
 # show distribution of margin
 def plot_target_distribution(y):
@@ -76,10 +78,13 @@ def export_feature_importance_to_excel(model, X, output_path='feature_importance
 
 
 ## Function to build and evaluate models with GridSearchCV and visualize performance
-def build_pipeline(X, y, original_columns):
-    # Split the data into training, validation, and holdout sets
-    X_train_val, X_holdout, y_train_val, y_holdout = train_test_split(X, y, test_size=0.2, random_state=22)
-    X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2, random_state=22)
+def build_pipeline(X, y, original_columns, vegas_margin):
+    # Split the data into validation, and holdout sets
+    X_train_val, X_holdout, y_train_val, y_holdout, vegas_train_val, vegas_holdout = train_test_split(
+        X, y, vegas_margin, test_size=0.2, random_state=30)
+    # further split into training and validation sets
+    X_train, X_val, y_train, y_val, vegas_train, vegas_val = train_test_split(
+        X_train_val, y_train_val, vegas_train_val, test_size=0.2, random_state=30)
 
     # Define pipelines with scaling where necessary
     pipelines = {
@@ -87,7 +92,7 @@ def build_pipeline(X, y, original_columns):
             ('model', DummyRegressor(strategy='mean'))
         ]),
         'Random Forest': Pipeline([
-            ('model', RandomForestRegressor(random_state=42))
+            ('model', RandomForestRegressor(random_state=30))
         ]),
         'Linear Regression': Pipeline([
             ('scaler', StandardScaler()),
@@ -95,7 +100,7 @@ def build_pipeline(X, y, original_columns):
         ]),
         'XGBoost': Pipeline([
             ('scaler', StandardScaler()),
-            ('model', XGBRegressor(random_state=42))
+            ('model', XGBRegressor(random_state=30))
         ])
     }
 
@@ -144,7 +149,7 @@ def build_pipeline(X, y, original_columns):
         print(f'  RMSE: {rmse_val:.4f}')
         print(f'  R^2: {r2_val:.4f}')
 
-        # Track the best model based on R^2 score
+        # Track the best model based on RMSE score
         if rmse_val < best_score:
             best_score = rmse_val
             best_model = best_pipeline
@@ -185,7 +190,7 @@ def build_pipeline(X, y, original_columns):
     plt.ylabel('Residuals')
     plt.grid(True)
     plt.show()
-    
+
     # Histogram of Residuals
     plt.figure(figsize=(10, 6))
     plt.hist(residuals, bins=30, color='skyblue', edgecolor='black')
@@ -194,7 +199,7 @@ def build_pipeline(X, y, original_columns):
     plt.ylabel('Frequency')
     plt.grid(True)
     plt.show()
-    
+
     # After creating the DataFrame with predicted values and residuals
     result_df = X_holdout.copy()
     result_df['Predicted'] = y_holdout_pred
@@ -211,12 +216,14 @@ def build_pipeline(X, y, original_columns):
     top_residuals_df.to_excel('largest_residuals_v2.xlsx', index=False)
     print("Largest residuals exported to 'largest_residuals_v2.xlsx'")
 
+    # Save the best model for later use
+    joblib.dump(best_model, f'{best_model_name}_best_model.pkl')
+    print(f'Best model saved as {best_model_name}_best_model.pkl')
+
+
 # Prep Data
 file_path = r"C:\Users\Dylan Chung\Desktop\NFL_Spread_Model\Data\Model_2020-2024v2(PFF).xlsx"
-X, spread, saved = Prepare_Data(file_path)
+X, margin, saved, vegas = Prepare_Data(file_path)
 
-# Plot the distribution of the target variable for investigation
-# plot_target_distribution(spread)
-
-# Use the function
-build_pipeline(X, spread, saved)
+# Use the original Pipeline function
+build_pipeline(X, margin, saved, vegas)
