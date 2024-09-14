@@ -20,12 +20,12 @@ def Prepare_Data(file_path):
     data['HomeTeam'] = 1
     data['AwayTeam'] = 0
 
-    # DROP UNNEEDED COLUMNS
-    X = data.drop(columns=['Date', 'Winner/tie', 'Margin', 'HPts', 'APts', 'Vegas_Margin','Time','Home_Key','Away_Key','WeekMinus','Vegas_Margin'])
+    # DROP UNNEEDED COLUMNS (dropping Season)
+    X = data.drop(columns=['Season','Date', 'Winner/tie', 'Margin', 'HPts', 'APts', 'Vegas_Margin','Time','Home_Key','Away_Key','WeekMinus','Vegas_Margin'])
     y = data['Margin']
 
     # One-hot encode categorical variables
-    X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv', 'Day','Season'], drop_first=True)
+    X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv', 'Day'], drop_first=True)
     
     # Create interaction term between Week and TO Margin
     X['Week_TO_Margin_Interaction'] = X['Week'] * X['Season_TO_Margin']
