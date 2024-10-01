@@ -25,11 +25,11 @@ def Prepare_Data(file_path):
     data['AwayTeam'] = 0
 
     # DROP UNNEEDED COLUMNS (dropping Season)
-    X = data.drop(columns=['Season','Date', 'Winner/tie', 'Margin', 'HPts', 'APts', 'Vegas_Margin','Time','Home_Key','Away_Key','WeekMinus','Vegas_Margin'])
+    X = data.drop(columns=['Season','Date', 'Day','Winner/tie', 'Margin', 'HPts', 'APts', 'Vegas_Margin','Time','Home_Key','Away_Key','WeekMinus','Vegas_Margin'])
     y = data['Margin']
 
     # One-hot encode categorical variables
-    X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv', 'Day'], drop_first=True)
+    X = pd.get_dummies(X, columns=['HomeDiv', 'AwayDiv'], drop_first=True)
     
     # Create interaction term between Week and TO Margin
     X['Week_TO_Margin_Interaction'] = X['Week'] * X['Season_TO_Margin']
@@ -217,12 +217,12 @@ def build_pipeline(X, y, original_columns, vegas_margin):
     print("Largest residuals exported to 'largest_residuals_v2.xlsx'")
 
     # Save the best model for later use
-    joblib.dump(best_model, f'{best_model_name}_best_model.pkl')
-    print(f'Best model saved as {best_model_name}_best_model.pkl')
+    joblib.dump(best_model, f'{best_model_name}_best_model_v2.pkl')
+    print(f'Best model saved as {best_model_name}_best_model_v2.pkl')
 
 
 # Prep Data
-file_path = r"C:\Users\Dylan Chung\Desktop\NFL_Spread_Model\Data\Model_2020-2024v2(PFF).xlsx"
+file_path = r"C:\Users\Dylan Chung\Desktop\NFL_Spread_Model\Data\Model_2020-2025v3(PFF).xlsx"
 X, margin, saved, vegas = Prepare_Data(file_path)
 
 # Use the original Pipeline function
