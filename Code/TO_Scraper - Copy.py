@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # Function to fetch data from the website for a specific date
 def fetch_data_for_date(date):
-    url = f"https://www.teamrankings.com/nfl/stat/turnover-margin-per-game?date={date}"
+    url = f"https://www.teamrankings.com/nfl/stat/penalty-yards-per-game?date={date}"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -19,8 +19,8 @@ def fetch_data_for_date(date):
         if len(cells) >= 4:  # Make sure there are enough cells in the row
             rank = cells[0].text.strip()  # Rank column
             team = cells[1].text.strip()  # Team column
-            turnover_margin = cells[2].text.strip()  # "2020" or season column
-            data.append([rank, team, turnover_margin])
+            third_down = cells[2].text.strip()  # "2020" or season column
+            data.append([rank, team, third_down])
 
     return data
 
@@ -28,8 +28,8 @@ def fetch_data_for_date(date):
 all_data = []
 
 # Define the start date and week counter (GO YEAR BY YEAR)
-start_date = datetime(2023, 9, 11)
-end_date = datetime(2024, 2, 8)  # Set the end date
+start_date = datetime(2021, 9, 14)
+end_date = datetime(2022, 2, 12)  # Set the end date
 week = 1
 
 while start_date <= end_date:  # Continue loop until start_date exceeds end_date
@@ -61,6 +61,6 @@ while start_date <= end_date:  # Continue loop until start_date exceeds end_date
 df = pd.DataFrame(all_data, columns=['Rank', 'Team', 'Margin', 'Week'])
 
 # Write the DataFrame to the same Excel sheet
-df.to_excel('NFL_Turnover_Margin_2023.xlsx', sheet_name='All Weeks', index=False)
+df.to_excel('NFL_Penalty2020.xlsx', sheet_name='All Weeks', index=False)
 
 print("Excel file created successfully.")
