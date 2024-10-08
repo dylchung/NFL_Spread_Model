@@ -200,7 +200,30 @@ def build_pipeline(X, y, original_columns, vegas_margin):
     plt.grid(True)
     plt.show()
 
-    # After creating the DataFrame with predicted values and residuals
+    # Prepare the comparison between the model and Vegas margin
+    model_error = np.abs(y_holdout_pred - y_holdout)
+    vegas_error = np.abs(vegas_holdout - y_holdout)
+
+    # Create a DataFrame for the holdout set comparison
+    results = pd.DataFrame({
+        'Actual_Margin': y_holdout,
+        'Predicted_Margin': y_holdout_pred,
+        'Vegas_Margin': vegas_holdout,
+        'Model_Error': model_error,
+        'Vegas_Error': vegas_error,
+        'Closer_Than_Vegas': model_error < vegas_error,
+        'Difference': vegas_holdout - y_holdout_pred,  # Difference between Vegas margin and predicted margin
+        'Abs_Difference': np.abs(vegas_holdout - y_holdout_pred)  # Absolute value of the difference
+    })
+    
+    # Merge the original columns back for analysis
+    results = results.merge(original_columns, left_index=True, right_index=True, how='left')
+
+    # Export to Excel
+    results.to_excel('holdout_comparison_v2.xlsx', index=False)
+    print("Holdout results exported to 'holdout_comparison_v2.xlsx'")
+
+    # Now, create the residuals DataFrame for further analysis
     result_df = X_holdout.copy()
     result_df['Predicted'] = y_holdout_pred
     result_df['Residual'] = residuals
